@@ -17,8 +17,10 @@ def initialize_session_state():
         st.session_state.user = None
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False
-    if 'is_signing_in' not in st.session_state:
-        st.session_state.is_signing_in = False
+    if 'page' not in st.session_state:
+        st.session_state.page = "home"  # Start on the home page
+    if 'sign_in_complete' not in st.session_state:
+        st.session_state.sign_in_complete = False  # Track if sign-in is done
     if 'is_admin' not in st.session_state:
         st.session_state.is_admin = False
 
@@ -63,16 +65,6 @@ def admin_login(email, password):
     else:
         st.error("Invalid admin credentials!")
 
-# Function to handle sign-in
-def sign_in(name, email, password, team_name):
-    query = f"INSERT INTO Student (Name, Email, Password, Team_ID) VALUES ('{name}', '{email}', '{password}', '{team_name}')"
-    try:
-        execute_query(query)  # Assuming this function executes a given SQL command
-        st.success("Sign-in successful! You can now log in.")
-        st.session_state.is_signing_in = False  # Reset sign-in state after success
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
-
 # Function to display student options
 def student_options():
     student_id = st.session_state.user['Student_ID']
@@ -97,8 +89,8 @@ def admin_options():
     st.header("Admin Dashboard")
 
     # Display the options as a sidebar menu
-    menu = ["Add Student", "Add Mentor", "Evaluate Project", "View All Records", 
-            "Display Student Info", "Assign Team to Project", "Delete Student", 
+    menu = ["Add Student", "Add Mentor", "Evaluate Project", "View All Records",
+            "Display Student Info", "Assign Team to Project", "Delete Student",
             "Update Project Status"]
     choice = st.sidebar.selectbox("Admin Menu", menu)
 
@@ -126,85 +118,125 @@ def admin_options():
     elif choice == "Update Project Status":
         update_project_status()
 
+# Function to handle sign-in
+def sign_in(name, email, password, team_name):
+    query = f"INSERT INTO Student (Name, Email, Password, Team_ID) VALUES ('{name}', '{email}', '{password}', '{team_name}')"
+    try:
+        execute_query(query)  # Assuming this function executes a given SQL command
+        st.success("Sign-in successful! You can now log in.")
+        st.session_state.sign_in_complete = True  # Set sign-in complete
+        st.session_state.page = "home"  # Immediately redirect to home page after signing in
+        st.experimental_rerun()  # Rerun the app to apply the page redirection
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
+
+# Function to handle sign-in
+def sign_in(name, email, password, team_name):
+    query = f"INSERT INTO Student (Name, Email, Password, Team_ID) VALUES ('{name}', '{email}', '{password}', '{team_name}')"
+    try:
+        execute_query(query)  # Insert the student into the database
+        st.success("Sign-in successful! You can now log in.")
+        # Immediately exit sign-in page and reload the app
+        st.session_state.is_signing_in = False  # Exit sign-in page
+        st.session_state.logged_in = False  # Ensure they need to log in after signing in
+        # Use JavaScript to reload the page to simulate navigation or rerun
+        st.write('<meta http-equiv="refresh" content="0">', unsafe_allow_html=True)
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
+
+# Function to render the sign-in page
+def sign_in_page():
+    st.subheader("Sign In")
+    name = st.text_input("Name")
+    new_email = st.text_input("Email (for Sign In)")
+    new_password = st.text_input("Password (for Sign In)", type="password")
+
+    # Fetch team names and IDs
+    teams = fetch_data("SELECT Team_ID, Team_Name FROM Team")
+    team_options = {team["Team_Name"]: team["Team_ID"] for team in teams}
+
+    # Dropdown to select team by name, storing the ID
+    selected_team_name = st.selectbox("Select Team", list(team_options.keys()))  # Display names
+    team_id = team_options[selected_team_name]  # Get the corresponding team_id
+
+    # Submit sign-in form
+    if st.button("Submit Sign In"):
+        # Validate email format using regex
+        email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_regex, new_email):
+            st.error("Invalid email format! Please enter a valid email.")
+        else:
+            sign_in(name, new_email, new_password, team_id)  # Use team_id
+
 # Main app function
 def main():
     st.title("Capstone Project Manager")
 
     initialize_session_state()
 
-    if not st.session_state.logged_in:
-        st.header("Login")
-        email = st.text_input("Email")
-        password = st.text_input("Password", type="password")
+    # Handle page navigation
+    if st.session_state.page == "home":
+        if st.session_state.sign_in_complete:
+            st.session_state.page = "home"
+            st.session_state.sign_in_complete = False  # Reset after returning
+            st.success("Sign-in successful! You can now log in.")
 
-        # Login buttons for different roles
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.button("Login as Student"):
-                login(email, password)
+        if not st.session_state.logged_in:
+            st.header("Login")
+            email = st.text_input("Email")
+            password = st.text_input("Password", type="password")
 
-        with col2:
-            if st.button("Login as Mentor"):
-                mentor_login(email, password)
+            # Login buttons for different roles
+            col1, col2 = st.columns(2)
 
-        # Admin login section
-        st.subheader("Admin Login")
-        admin_email = st.text_input("Admin Email")
-        admin_password = st.text_input("Admin Password", type="password")
-        if st.button("Login as Admin"):
-            admin_login(admin_email, admin_password)
+            with col1:
+                if st.button("Login as Student"):
+                    login(email, password)
 
-        # Sign-in section for new students
-        if st.button("Sign In (New Student)"):
-            st.session_state.is_signing_in = True
+            with col2:
+                if st.button("Login as Mentor"):
+                    mentor_login(email, password)
 
-        if st.session_state.is_signing_in:
-            st.subheader("Sign In")
-            name = st.text_input("Name")
-            new_email = st.text_input("Email (for Sign In)")
-            new_password = st.text_input("Password (for Sign In)", type="password")
+            # Admin login section
+            st.subheader("Admin Login")
+            admin_email = st.text_input("Admin Email")
+            admin_password = st.text_input("Admin Password", type="password")
+            if st.button("Login as Admin"):
+                admin_login(admin_email, admin_password)
 
-            # 1. Fetch team names and IDs
-            teams = fetch_data("SELECT Team_ID, Team_Name FROM Team")
-            team_options = {team["Team_Name"]: team["Team_ID"] for team in teams}
+            # Sign-in section for new students
+            if st.button("Sign In (New Student)"):
+                st.session_state.page = "sign_in"
 
-            # 2. Dropdown to select team by name, storing the ID
-            selected_team_name = st.selectbox("Select Team", list(team_options.keys()))  # Display names
-            team_id = team_options[selected_team_name]  # Get the corresponding team_id
-
-            # 3. Use team_id in the sign_in function
-            if st.button("Submit Sign In"):
-                # Validate email format using regex
-                email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-                if not re.match(email_regex, new_email):
-                    st.error("Invalid email format! Please enter a valid email.")
-                else:
-                    sign_in(name, new_email, new_password, team_id)  # Use team_id
-    else:
-        # Welcome message and options for logged-in users
-        st.header("Welcome!")
-        if st.session_state.user is not None and "Name" in st.session_state.user:
-            st.write(f"Logged in as: {st.session_state.user['Name']}")
         else:
-            st.error("User not found. Please log in again.")
-        
-        # Logout button
-        if st.button("Logout"):
-            st.session_state.user = None
-            st.session_state.logged_in = False
-            st.session_state.is_admin = False
+            # Welcome message and options for logged-in users
+            st.header("Welcome!")
+            if st.session_state.user is not None and "Name" in st.session_state.user:
+                st.write(f"Logged in as: {st.session_state.user['Name']}")
+            else:
+                st.error("User not found. Please log in again.")
 
-        # Check user role safely
-        if st.session_state.user is not None and "Role" in st.session_state.user:
-            if st.session_state.user["Role"] == "Student":
-                student_options()  # You will need to define this function elsewhere
-            elif st.session_state.user["Role"] == "Mentor":
-                mentor_options()  # You will need to define this function elsewhere
-            elif st.session_state.is_admin:
-                admin_options()
-        else:
-            st.error("User role not found. Please log in again.")
+            # Right-aligned Logout button
+            _, col, _ = st.columns([6, 1, 1])
+            with col:
+                if st.button("Logout"):
+                    st.session_state.user = None
+                    st.session_state.logged_in = False
+                    st.session_state.is_admin = False
+
+            # Check user role safely
+            if st.session_state.user is not None and "Role" in st.session_state.user:
+                if st.session_state.user["Role"] == "Student":
+                    student_options()  # You will need to define this function elsewhere
+                elif st.session_state.user["Role"] == "Mentor":
+                    mentor_options()  # You will need to define this function elsewhere
+                elif st.session_state.is_admin:
+                    admin_options()
+            else:
+                st.error("User role not found. Please log in again.")
+
+    elif st.session_state.page == "sign_in":
+        sign_in_page()  # Render the sign-in page
 
 if __name__ == "__main__":
     main()

@@ -14,6 +14,9 @@ CREATE TABLE Mentor (
     Password VARCHAR(100),
     Department VARCHAR(100)
 );
+ALTER TABLE Mentor
+ADD CONSTRAINT email_format CHECK (Email REGEXP '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+ALTER TABLE Team ADD Mentor_ID INT;
 
 -- 3. Create Project table (as Feedback and Evaluation reference Project)
 CREATE TABLE Project (
@@ -65,7 +68,7 @@ CREATE TABLE Evaluation (
     Grade DECIMAL(3, 2),
     Comments TEXT,
     Evaluation_Date DATE,
-    FOREIGN KEY (Project_ID) REFERENCES Project(Project_ID),
+    FOREIGN KEY (Project_ID) REFERENCES Project(Project_ID),  -- Now Project_ID can appear multiple times
     FOREIGN KEY (Panel_ID) REFERENCES Panel(Panel_ID)
 );
 show databases;
@@ -114,6 +117,46 @@ BEGIN
     VALUES (p_name, p_status, p_team_id, p_mentor_id);
 END //
 DELIMITER ;
+
+-- Get Team Info
+DELIMITER $$
+CREATE PROCEDURE get_team_info(IN student_id INT)
+BEGIN
+    SELECT 
+        T.Team_Name,
+        M.Name AS Mentor_Name,
+        GROUP_CONCAT(S.Name SEPARATOR ', ') AS Team_Members,
+        GROUP_CONCAT(E.Comments SEPARATOR '; ') AS Review
+    FROM Team T
+    JOIN Student S ON T.Team_ID = S.Team_ID
+    JOIN Mentor M ON T.Mentor_ID = M.Mentor_ID
+    LEFT JOIN Project P ON T.Team_ID = P.Team_ID  -- If projects relate to teams
+    LEFT JOIN Evaluation E ON P.Project_ID = E.Project_ID  -- Assuming evaluations are linked to projects
+    WHERE S.Student_ID = student_id
+    GROUP BY T.Team_ID;
+END$$
+DELIMITER ;
+drop procedure get_team_info;
+USE dbms_project;
+
+-- Get Student Info
+DELIMITER //
+CREATE PROCEDURE get_student_info(IN student_id INT)
+BEGIN
+    SELECT 
+        T.Team_Name,
+        M.Name AS Mentor_Name,
+        (SELECT GROUP_CONCAT(S.Name SEPARATOR ', ') 
+         FROM Student S WHERE S.Team_ID = T.Team_ID) AS Team_Members,
+        F.Comments AS Review
+    FROM Team T
+    JOIN Student S ON T.Team_ID = S.Team_ID
+    JOIN Mentor M ON T.Mentor_ID = M.Mentor_ID
+    LEFT JOIN Feedback F ON T.Team_ID = F.Project_ID
+    WHERE S.Student_ID = student_id;
+END //
+DELIMITER ;
+
 
 -- Triggers
 -- Trigger to log feedback when inserted
@@ -168,3 +211,39 @@ BEGIN
     VALUES (p_project_id, p_panel_id, p_grade, p_comments, CURDATE());
 END //
 DELIMITER ;
+
+
+
+-- Start Inserting Values 
+INSERT INTO Mentor (Name, Email, Password, Department) VALUES 
+('Prof NVP', 'nvp@gmail.com', 'password123', 'Computer Science'),
+('Dr. Jayashree R', 'jayashree@gmail.com', 'password123', 'AIML'),
+('Dr. Jawahar', 'jawahar@gmail.com', 'password123', 'Data Science'),
+('Prof BJD', 'bjd@gmail.com', 'password123', 'AIML');
+
+INSERT INTO Team (Team_Name, Mentor_ID) VALUES 
+('Team Alpha',1),
+('Team Beta',2),
+('Team Gamma',4);
+
+INSERT INTO Project (Project_Name, Initial_Draft, Final_Submission, Status, Submission_Date, Team_ID, Mentor_ID) VALUES 
+('AI-Powered System', 'draft_v1.docx', 'final_v1.docx', 'In Progress', '2024-10-20', 1, 1),  -- Assigned to Team Alpha, Mentor Prof NVP
+('ZKP-Blockchain Research', 'draft_v2.docx', 'final_v2.docx', 'Not Started', NULL, 2, 2);        -- Assigned to Team Beta, Mentor Dr. Jayashree R
+
+INSERT INTO Student (Name, Email, Password, Team_ID, Role) VALUES 
+('Adityanath Yogi', 'adityanath@gmail.com', 'yogi', 1, 'Student'),
+('Narendra Modi', 'narendra@gmail.com', 'modi', 1, 'Student'),
+('Amit Shah', 'amit@gmail.com', 'amit', 1, 'Student'),
+('S Jayashankar', 'jayashankar@gmail.com', 'jayshankar', 1, 'Student');
+
+INSERT INTO Student (Name, Email, Password, Team_ID, Role) VALUES 
+('Kharge Mallikarjun', 'kharge@gmail.com', 'kharge', 2, 'Student'),
+('Rahul Gandhi', 'rahul@gmail.com', 'rahul', 2, 'Student'),
+('Priyanka Gandhi', 'priyanka@gmail.com', 'priyanka', 2, 'Student'),
+('Manmohan Singh', 'manmohan@gmail.com', 'manmohan', 2, 'Student');
+
+INSERT INTO Panel (Panel_Name) VALUES 
+('ISA Panel'),
+('ESA Panel');
+
+SELECT * FROM student;

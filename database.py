@@ -5,10 +5,10 @@ import streamlit as st
 def get_connection():
     try:
         connection = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="mysql",
-            database="dbms_project"
+            host="<host name>",
+            user="<user name>",
+            password="<your passwd>",
+            database="<db name>"
         )
         return connection
     except Error as e:

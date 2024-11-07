@@ -1,5 +1,6 @@
 import streamlit as st
-from database import execute_procedure,execute_query
+import re
+from database import execute_procedure, execute_query
 
 def add_student():
     st.subheader("Add Student")
@@ -9,6 +10,13 @@ def add_student():
     team_id = st.number_input("Team ID", min_value=1)
     role = st.selectbox("Role", ["Student", "Mentor"])
 
+    # Email validation regex
+    email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z0-9]{2,}$'
+
     if st.button("Add Student"):
-        execute_procedure("AddStudent", (name, email, password, team_id, role))
-        st.success(f"Student {name} added successfully!")
+        # Check if the email matches the required format
+        if not re.match(email_regex, email):
+            st.error("Invalid email format! Please enter a valid email address.")
+        else:
+            execute_procedure("AddStudent", (name, email, password, team_id, role))
+            st.success(f"Student {name} added successfully!")

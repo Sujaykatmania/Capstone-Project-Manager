@@ -8,6 +8,8 @@ from add_mentor import add_mentor
 from assign_team import assign_team_to_project  # Import the assign team function
 from delete import delete_student  # Import the delete student function
 from update_project import update_project_status  # Import the update project function
+import re
+
 
 # Function to initialize session state
 def initialize_session_state():
@@ -173,7 +175,12 @@ def main():
 
             # 3. Use team_id in the sign_in function
             if st.button("Submit Sign In"):
-                sign_in(name, new_email, new_password, team_id)  # Use team_id
+                # Validate email format using regex
+                email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+                if not re.match(email_regex, new_email):
+                    st.error("Invalid email format! Please enter a valid email.")
+                else:
+                    sign_in(name, new_email, new_password, team_id)  # Use team_id
     else:
         # Welcome message and options for logged-in users
         st.header("Welcome!")
@@ -200,4 +207,4 @@ def main():
             st.error("User role not found. Please log in again.")
 
 if __name__ == "__main__":
-    main()  
+    main()

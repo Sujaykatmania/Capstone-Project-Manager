@@ -9,9 +9,20 @@ def delete_student():
     if st.button("Delete Student"):
         conn = get_connection()
         cursor = conn.cursor()
-        query = "DELETE FROM Student WHERE Student_ID = %s"
-        cursor.execute(query, (student_id,))
-        conn.commit()
-        st.success("Student deleted successfully.")
+
+        # Check if the student exists
+        check_query = "SELECT COUNT(*) FROM Student WHERE Student_ID = %s"
+        cursor.execute(check_query, (student_id,))
+        result = cursor.fetchone()
+
+        if result[0] > 0:
+            # If student exists, delete the record
+            delete_query = "DELETE FROM Student WHERE Student_ID = %s"
+            cursor.execute(delete_query, (student_id,))
+            conn.commit()
+            st.success("Student deleted successfully.")
+        else:
+            st.error("Student does not exist.")
+        
         cursor.close()
         conn.close()
